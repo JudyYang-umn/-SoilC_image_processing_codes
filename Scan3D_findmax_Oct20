@@ -1,0 +1,210 @@
+clc
+close all
+clear;
+
+figure_title = '3-5kDa Dextran(0.005%)';
+
+file_path = '/Volumes/JudyYang_SoilC/Confocal_dextran_glucose_diffuse/Sept16_Confocal_3_5kda_dextran/Confocal_3_5kda_dextran_Sept16/';
+folder_name0 = 'Series';
+series_nb = [2:45];
+file_name_pre = 'Dextran_3_5kda_Series';
+imposeimage_folder = '/Volumes/JudyYang_SoilC/Confocal_dextran_glucose_diffuse/Sept16_Confocal_3_5kda_dextran/Matlab/Super_impose_z36_2/'
+z_nb = [42];
+dx = 1.517; % in micron
+gap = 10; % 
+
+dz = 0.988; %um 
+z_dis = [1:z_nb(1)]*dz;
+pixel_nb = 512;
+pixel_size = dx;
+x_nb = pixel_nb;
+image_size = pixel_nb*pixel_size; % microns
+
+dt = 1; % minutes
+t_nb = 95;
+T_tot_hr = dt*t_nb*numel(series_nb)/60; % hours
+t_all = [0:dt/60:T_tot_hr]; % hours
+
+colorset = jet(t_nb*numel(series_nb));
+
+rect_bkg = [ 327   171    56    36];
+
+
+tt_record = [];
+data = load('clay_boundary.mat');
+clay_boundary =  data.clay_bdy;
+
+%% crop image 
+
+% images_0  = imread(['Series003_t00_z060_ch01','.tif']);
+% %%%%%%%%%%%%%%% Plot the image %%%%%%%%%%%
+% figure; hold on
+% imshow(images_0);
+% hold on
+% waitfor(msgbox('Crop the region for the window intensity'));
+% rect = getrect % [xmin ymin width height]
+% rect = round(rect);
+% A_clay = imcrop(images_0,rect);
+% 
+% rect = [202   258    70    56]; %red 2
+% rect_bkg = [114   267    47    32];
+% 
+% % prof_x = [426 426];
+% % prof_y = [160 220];
+% 
+%             rectangle('position',rect,'EdgeColor','r','linewidth',2);
+%             rectangle('position',rect_bkg,'EdgeColor','b','linewidth',2);
+% %             line_prop = line(prof_x,prof_y,'color','r','linewidth',2)
+% %             
+%            %%%%% add scale bar to the images 
+%             Scalebar_length = 100; 
+%             x_location = 420;
+%             y_location = 500;
+%             
+% %             hbar = quiver(x_location,y_location,round(Scalebar_length/pixel_size),0,'ShowArrowHead','off')
+% %             set(hbar,'color','w','linewidth',2);
+% % 
+% %             htext = text(x_location+round(Scalebar_length/pixel_size)/2,y_location-20,'100\mum','HorizontalAlignment','center')
+% %             set(htext,'color','w','fontsize',20,'FontWeight','bold');
+% 
+%             set(gca,'xtick',[],'ytick',[])
+%             set(gca,'LooseInset',get(gca,'TightInset'));
+% %             set(gcf, 'PaperSize', [4 2]);
+% %             fig = gcf
+% %             set(fig,'PaperPositionMode','auto')
+%             
+%             saveas(gcf,['superimposed.tif']);
+% 
+
+%% super impose images 
+for kk= 1:numel(series_nb)
+    for tt_i = 1:gap:t_nb(1)
+        
+        tt = (kk-1)*t_nb(1) + tt_i;
+        se_id = sprintf('%03d', series_nb(kk));
+        folder_name = [folder_name0,num2str(se_id),'/'];
+        file_name = [file_name_pre ,num2str(se_id)];
+        
+        Imatrix{tt} = [];
+        for zz = 1: z_nb
+
+            pic_tid = sprintf('%02d', tt_i-1);
+            pic_zid = sprintf('%03d', zz-1);
+            filename_OM{zz} = [file_name,'_t',num2str(pic_tid),'_z',num2str(pic_zid),'_ch00'];
+            filename_bf{zz} = [file_name,'_t',num2str(pic_tid),'_z',num2str(pic_zid),'_ch01'];
+            
+            A_clay0  = imread([file_path,folder_name,filename_OM{zz},'.tif']);
+
+%             A_clay_crop = imcrop(A_clay0,rect);
+            A_clay = A_clay0;
+%             A_clay_bkg = imcrop(A_clay0,rect_bkg);
+
+
+             %%%%%%%%%%% calculate the average intensity and standard
+            %%%%%%%%%%% deviation %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            A_double = double(A_clay);
+            A_array = reshape(A_double, [numel(A_double),1]);
+            img_int_tot{zz}(tt) = mean(A_array);
+            img_int_tot_std{zz}(tt) = std(A_array);
+            
+%             A_double2 = double(A_clay_crop);
+%             A_array2 = reshape(A_double2, [numel(A_double2),1]);
+%             img_int_clay{zz}(tt) = mean(A_array2);
+%             img_int_clay_std{zz}(tt) = std(A_array2);
+%             
+            img_int_t{tt}(zz) = img_int_tot{zz}(tt);
+%             
+%             A_double_bkg = double(A_clay_bkg);
+%             A_array_bkg = reshape(A_double_bkg, [numel(A_double_bkg),1]);
+%             img_int_bkg{zz}(tt) = mean(A_array_bkg);
+
+        end
+        
+            [ int_tot_max_t(tt), index_z_max(tt)] = max(img_int_t{tt});
+%             img_int_bkg_t(tt) = img_int_bkg{index_z_max(tt)}(tt);
+%             img_int_clay_t(tt) = img_int_clay{index_z_max(tt)}(tt);
+%             clay_max = imread([file_path,folder_name,filename_OM{index_z_max(tt)},'.tif']);
+%             bf_max = imread([file_path,folder_name,filename_bf{index_z_max(tt)},'.tif']);
+
+            copyfile([file_path,folder_name,filename_OM{index_z_max(tt)},'.tif'],[pwd,'/Fluo_zmax/','t_',num2str(tt),'.tif'])
+            copyfile([file_path,folder_name,filename_bf{index_z_max(tt)},'.tif'],[pwd,'/BF_zmax/','t_',num2str(tt),'.tif'])
+
+            %                     %% super impose iages
+
+%                     [m n r]=size( clay_max);
+%                     rgb=zeros(m,n,3);
+%                     rgb(:,:,2)= clay_max;
+% 
+%                     figure(25) 
+%                     image(0*bf_max)            
+%                     axis equal;
+%                     axis([1 pixel_nb 1 pixel_nb])
+%                     colormap(gray(256));
+%                     hold on
+%                     Image_clay_int=rgb/255;
+%                     image(Image_clay_int, 'AlphaData', 0.5)
+% 
+%         %             rectangle('position',rect,'EdgeColor','r','linewidth',2);
+%         %             rectangle('position',rect_bkg,'EdgeColor','b','linewidth',2);
+%         %             line_prop = line(prof_x,prof_y,'color','r','linewidth',2)
+%         %             
+% 
+%                                 %%%%% add scale bar to the images 
+%                     Scalebar_length = 100; 
+%                     x_location = 420;
+%                     y_location = 500;
+% 
+%                     hbar = quiver(x_location,y_location,round(Scalebar_length/pixel_size),0,'ShowArrowHead','off')
+%                     set(hbar,'color','w','linewidth',2);
+% 
+%                     htext = text(x_location+round(Scalebar_length/pixel_size)/2,y_location-20,'100\mum','HorizontalAlignment','center')
+%                     set(htext,'color','w','fontsize',20,'FontWeight','bold');
+% 
+%                     set(gca,'xtick',[],'ytick',[])
+%                     set(gca,'LooseInset',get(gca,'TightInset'));
+%         %             set(gcf, 'PaperSize', [4 2]);
+%         %             fig = gcf
+%         %             set(fig,'PaperPositionMode','auto')
+% 
+%                     saveas(gcf,...
+%                         [imposeimage_folder,'t_',num2str(tt),'.tif']);
+
+    end
+end
+
+save('img_int.mat')
+%% plot the change in maximum intensity 
+
+for zz = z_plane %1:z_nb(1)%
+h_int = figure(zz); hold on;
+set(gca,'fontsize',28);
+
+index_int = find(img_int_tot{zz}>0);
+yyaxis right
+
+plot(t_all(index_int),[img_int_tot{zz}(index_int)],'ro-','linewidth',2)%'Linestyle','none')%
+% plot([1:gap:tt]*dt/60,[img_int_tot{zz}(1:gap:tt)],'ro-','linewidth',2)
+ylabel('Clay intensity');
+ylim([0 inf])
+set(gca,'YColor',[1 0 0]); 
+
+yyaxis left
+plot(t_all(index_int),[img_int_bkg{zz}(index_int)],'bs-','linewidth',2)
+ylabel('Background intensity');
+ylim([1 2])
+set(gca,'YColor',[0 0 1]); 
+
+xlabel('Time (hours)')
+
+% legend('Clay intensity','Background intensity','location','northeast');
+% legend boxoff
+
+box on;
+% xlim([4 7])
+title(figure_title )
+set(h_int,'PaperPositionMode','Manual')
+set(h_int,'PaperUnits','inches')
+set(h_int,'PaperSize',[8 6])
+set(h_int,'PaperPosition',[0 0 8 6])
+saveas(h_int, ['clay_bkg_time'], 'pdf')
+end
