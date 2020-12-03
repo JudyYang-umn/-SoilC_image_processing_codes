@@ -1,0 +1,345 @@
+clc
+close all
+clear;
+
+% figure_title = '3-5kDa Dextran(0.005%)';
+figure_title = 'Dextran';
+
+file_path_clay = [pwd,'/Fluo_zmax/'];
+file_path_bf =  [pwd,'/BF_zmax/'];
+file_path_red = [pwd,'/Red_zmax/'];
+
+dx = 1.596; % in micron
+pixel_size = dx;
+gap = 3; % 
+
+dt = 10; % minutes
+t_tot_nb = 384;
+t_nb_all = [3:t_tot_nb ];
+Int_clay_crit0 = 0.01;
+
+tt_all = t_nb_all*dt/60; %[0:dt:(t_tot_nb-1)*dt]/60; % hours
+% tt_gap_indx = [1:gap:t_tot_nb];
+colorset = jet(t_tot_nb);
+
+A_clay0  = imread([file_path_bf,'t_6','.tif']);
+figure 
+imshow(A_clay0)
+% rect_bkg = getrect % [xmin ymin width height]
+% rect = [202   258    70    56]; %red middle
+rect_bkg = [54   213    77    29];
+
+% prof_x = [364 364]; % middle clay
+% prof_y = [440   602];
+prof_x = [364 364]; % middle clay
+prof_y = [443.6   602];
+
+t_35kda_dextran = (35-3)*dt/60; %hours
+t_20kda_dextran = (125-3)*dt/60+1;
+t_70kda_dextran = (179-3)*dt/60+1;
+t_M9 = (246-3)*dt/60;
+t_enzyme = (293-3)*dt/60;
+
+
+
+%% crop image 
+
+A_clay  = imread([file_path_clay,'t_171','.tif']);
+A_BF  = imread([file_path_bf,'t_171','.tif']);
+A_clay_red  = imread([file_path_red,'t_171','.tif']);
+%%%%%%%%%%%%%%% Plot the image %%%%%%%%%%%
+
+    [m n r]=size( A_clay);
+    rgb=zeros(m,n,3);
+    rgb(:,:,2)= A_clay;
+    
+    rgb_red = zeros(m,n,3);
+    rgb_red(:,:,1)= A_clay_red;
+    
+    figure(25) 
+    image(A_BF)            
+    axis equal;
+    axis([1 n 1 m])
+    colormap(gray(256/2.5));
+    hold on
+    Image_clay_int=rgb/255;
+    Image_clay_red=rgb_red/255;
+    
+    image(Image_clay_red,'AlphaData', 0.3)
+    image(Image_clay_int,'AlphaData', 0.3)
+    hold on
+    axis equal;
+    axis([1 m 1 n])
+
+% waitfor(msgbox('Crop the region for the window intensity'));
+% rect = getrect % [xmin ymin width height]
+% rect = round(rect);
+% A_clay = imcrop(images_0,rect);
+
+[cx,cy,c,xi,yi] = improfile(A_clay,prof_x,prof_y);
+line_prop = line(xi,yi,'color','r','linewidth',3)
+dis_step = sqrt((mean(diff(cx)))^2+mean(diff(cy))^2)*pixel_size; %microns
+
+
+% %             rectangle('position',rect,'EdgeColor','r','linewidth',2);
+%             rectangle('position',rect_bkg,'EdgeColor','b','linewidth',2);
+% %             
+           %%%%% add scale bar to the images 
+            Scalebar_length = 100; 
+            x_location = 420;
+            y_location = 500;
+            
+            hbar = quiver(x_location,y_location,round(Scalebar_length/pixel_size),0,'ShowArrowHead','off')
+            set(hbar,'color','w','linewidth',2);
+
+            htext = text(x_location+round(Scalebar_length/pixel_size)/2,y_location-20,'100\mum','HorizontalAlignment','center')
+            set(htext,'color','w','fontsize',20,'FontWeight','bold');
+
+            set(gca,'xtick',[],'ytick',[])
+            set(gca,'LooseInset',get(gca,'TightInset'));
+%             set(gcf, 'PaperSize', [4 2]);
+%             fig = gcf
+%             set(fig,'PaperPositionMode','auto')
+            
+            saveas(gcf,['Cross_Top_march2020.tif']);
+
+            
+            %% super impose images 
+for tt_0 = 1:gap:numel(t_nb_all)
+    
+    tt = t_nb_all(tt_0);
+    
+    filename_OM{tt} = [file_path_clay,'t_',num2str(tt)];
+    filename_bf{tt} = [file_path_bf,'t_',num2str(tt)];
+    filename_Red{tt} = [file_path_red,'t_',num2str(tt)];
+            
+    A_clay0  = imread([filename_OM{tt},'.tif']);
+    A_BF  = imread([filename_bf{tt},'.tif']);
+    A_clay_red  = imread([filename_Red{tt},'.tif']);
+
+%     A_clay = imcrop(A_clay0,rect);
+%     A_BF_crop = imcrop(A_BF,rect);
+    A_clay = A_clay0;
+    A_BF_crop = A_BF;
+    
+%     A_clay_crop = imcrop(A_clay,rect);
+    A_clay_bkg = imcrop(A_clay,rect_bkg);
+    
+     %%%%%%%%%%% calculate the average intensity and standard
+    %%%%%%%%%%% deviation %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    A_double = double(A_clay);
+    A_array = reshape(A_double, [numel(A_double),1]);
+    img_int_tot(tt) = mean(A_array);
+    img_int_tot_std(tt) = std(A_array);
+
+%     A_double2 = double(A_clay_crop);
+%     A_array2 = reshape(A_double2, [numel(A_double2),1]);
+%     img_int_clay(tt) = mean(A_array2);
+%     img_int_clay_std(tt) = std(A_array2);
+
+
+    A_double_bkg = double(A_clay_bkg);
+    A_array_bkg = reshape(A_double_bkg, [numel(A_double_bkg),1]);
+    img_int_bkg(tt) = mean(A_array_bkg);
+    
+    
+    %% find the intensity across the profile 
+    [int_prof{tt}] = improfile(A_clay,prof_x,prof_y);            
+    int_prof_smooth{tt} = movmean(int_prof{tt},10);
+    
+     %% find the redintensity across the profile 
+    [int_prof_red{tt}] = improfile(A_clay_red,prof_x,prof_y);            
+    int_prof_smooth_red{tt} = movmean(int_prof_red{tt},10);
+
+
+    %% plot the green profile 
+    h_prf = figure(316); hold on
+%             set(h_pdf,'visible','off');
+    set(gca,'fontsize',26,'fontweight','bold');             
+    plot(dis_step*[0:numel(c)-1],int_prof_smooth{tt}/255,'-','color',colorset(tt,:));
+%     colormap(jet);
+%     h = colorbar;
+%     ylabel(h, ['Time (',num2str(max(tt_all),2),'hours)'])
+
+    set(gca,'units','normalized','Position',[0.24 0.3333 0.4 0.5333])
+%             set(h_pdf,'visible','off');
+  set(gca,'units','normalized','Position',[0.14 0.20 0.6 0.68])
+
+    xlabel('Z [\mum]')
+    ylabel('Pixel intensity');
+    title('Green fluorescence');
+    box on;
+
+end
+
+    colormap(jet);
+    CB = colorbar('XTick', 0.2:0.2:1);
+    CB.AxisLocation  = 'in';
+    title(CB,['Time/',num2str(max(tt_all),2),'hours'])
+%     hlab = ylabel(h, ['Time (',num2str(max(tt_all),2),'hours)'])
+
+    %%%% label colorbar
+
+    set(CB,'Position',[0.82 CB.Position(2) CB.Position(3) CB.Position(4)])
+    cLimits = caxis();
+    barPos = get(CB, 'Position');
+    xArrow = barPos(1)+barPos(3)+[0.02 0];
+    
+%     t_35kda_dextran = (35-3)*dt/60; %hours
+% t_20kda_dextran = (125-3)*dt/60;
+% t_70kda_dextran = (179-3)*dt/60;
+% t_M9 = (246-3)*dt/60;
+% t_enzyme = (293-3)*dt/60;
+
+    yArrow = barPos(2)+barPos(4)*(t_35kda_dextran/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{gC}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26;     
+    
+    yArrow = barPos(2)+barPos(4)*(t_20kda_dextran/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{rC}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26;    
+    
+    yArrow = barPos(2)+barPos(4)*(t_70kda_dextran/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{gC2}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26; 
+    
+    yArrow = barPos(2)+barPos(4)*(t_M9/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{noC}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26;
+    
+    yArrow = barPos(2)+barPos(4)*(t_enzyme/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{enzyme}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26; 
+    
+
+    
+%     yArrow = barPos(2)+barPos(4)*(t_nocarbon2/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+%     hArrow = annotation('textarrow', xArrow, yArrow, ...
+%                     'String', 't_{noC2}', 'Color', 'r','HeadStyle','plain');
+%     hArrow.FontSize = 26;
+    
+    ylim([-0.03 0.8])
+    hold on 
+
+    set(h_prf,'PaperPositionMode','Manual')
+    set(h_prf,'PaperUnits','inches')
+    set(h_prf,'PaperSize',[10 6])
+    set(h_prf,'PaperPosition',[0 0 10 6])
+    saveas(h_prf, ['Prof_bottom_green_march2020'], 'pdf')
+
+    
+    %% plot the distirbution of red intensity 
+    
+    %% plot the green profile 
+    for tt_0 = 1:gap:numel(t_nb_all)
+    
+    tt = t_nb_all(tt_0);
+    
+    h_prf_red = figure(3160); hold on
+%             set(h_pdf,'visible','off');
+    set(gca,'fontsize',26,'fontweight','bold');             
+    plot(dis_step*[0:numel(c)-1],int_prof_smooth_red{tt}/255/1.5,'-','color',colorset(tt,:));
+%     colormap(jet);
+%     h = colorbar;
+%     ylabel(h, ['Time (',num2str(max(tt_all),2),'hours)'])
+
+    set(gca,'units','normalized','Position',[0.24 0.3333 0.4 0.5333])
+%             set(h_pdf,'visible','off');
+  set(gca,'units','normalized','Position',[0.14 0.20 0.6 0.68])
+
+    xlabel('Z [\mum]')
+    ylabel('Pixel intensity');
+    title('Red fluorescence');
+    box on;
+
+end
+
+    colormap(jet);
+    CB = colorbar('XTick', 0.2:0.2:1);
+    CB.AxisLocation  = 'in';
+    title(CB,['Time/',num2str(max(tt_all),2),'hours'])
+%     hlab = ylabel(h, ['Time (',num2str(max(tt_all),2),'hours)'])
+
+    %%%% label colorbar
+
+    set(CB,'Position',[0.82 CB.Position(2) CB.Position(3) CB.Position(4)])
+    cLimits = caxis();
+    barPos = get(CB, 'Position');
+    xArrow = barPos(1)+barPos(3)+[0.02 0];
+    
+%     t_35kda_dextran = (35-3)*dt/60; %hours
+% t_20kda_dextran = (125-3)*dt/60;
+% t_70kda_dextran = (179-3)*dt/60;
+% t_M9 = (246-3)*dt/60;
+% t_enzyme = (293-3)*dt/60;
+
+    yArrow = barPos(2)+barPos(4)*(t_35kda_dextran/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{gC}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26;     
+    
+    yArrow = barPos(2)+barPos(4)*(t_20kda_dextran/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{rC}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26;    
+    
+    yArrow = barPos(2)+barPos(4)*(t_70kda_dextran/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{gC2}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26; 
+    
+    yArrow = barPos(2)+barPos(4)*(t_M9/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{noC}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26;
+    
+    yArrow = barPos(2)+barPos(4)*(t_enzyme/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+    hArrow = annotation('textarrow', xArrow, yArrow, ...
+                    'String', 't_{enzyme}', 'Color', 'r','HeadStyle','plain');
+    hArrow.FontSize = 26; 
+    
+
+    
+%     yArrow = barPos(2)+barPos(4)*(t_nocarbon2/max(tt_all)-cLimits(1))/diff(cLimits)+[0 0];    
+%     hArrow = annotation('textarrow', xArrow, yArrow, ...
+%                     'String', 't_{noC2}', 'Color', 'r','HeadStyle','plain');
+%     hArrow.FontSize = 20;
+    
+    ylim([-0.03 0.66])
+    hold on 
+
+    set(h_prf_red ,'PaperPositionMode','Manual')
+    set(h_prf_red ,'PaperUnits','inches')
+    set(h_prf_red ,'PaperSize',[10 6])
+    set(h_prf_red ,'PaperPosition',[0 0 10 6])
+    saveas(h_prf_red , ['Prof_bottom_red_July2020_2'], 'pdf')
+
+    %%
+%     %% plot the maximum intensity as a function of time 
+% h_intt = figure; hold on
+% set(gca,'fontsize',20,'linewidth',2);
+% 
+% plot(tt_gap_indx*dt/60, img_int_clay(tt_gap_indx),'rs-','markersize',12);% hour 
+% plot(tt_gap_indx*dt/60, img_int_bkg(tt_gap_indx),'b+-','markersize',6);% hour 
+% 
+% legend('Clay intensity (red)','Background intensity (blue)');
+% legend boxoff
+% 
+% box on
+% xlabel('Time [hours]')
+% ylabel('Maximum average pixel intensity');
+% title(figure_title);
+% 
+% set(h_intt ,'PaperPositionMode','Manual')
+% set(h_intt ,'PaperUnits','inches')
+% set(h_intt ,'PaperSize',[8 6])
+% set(h_intt ,'PaperPosition',[0 0 8 6])
+% saveas(h_intt , ['clay_mtop2'], 'pdf')
+
+%%
+save(['Prof_Top_clay_wash_July2020.mat'])
