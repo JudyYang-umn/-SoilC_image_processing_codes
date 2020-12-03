@@ -1,0 +1,418 @@
+clc
+close all
+clear;
+
+figure_title = '3-kDa Dextran';
+file_path_clay = [pwd,'/Fluo_zmax/'];
+file_path_bf =  [pwd,'/BF_zmax/'];
+
+mapdata = load('greenmap.mat');
+greenmap = mapdata.greenmap;
+
+Int_clay_crit0 = 0.01;
+
+file_path = '/Volumes/Judy_SoilC_2/Clay_diffusion_data_backup2020/Sept16_Confocal_3_5kda_dextran/Confocal_3_5kda_dextran_Sept16/';
+folder_name0 = 'Series';
+series_nb = [2:45];
+file_name_pre = 'Dextran_3_5kda_Series';
+% imposeimage_folder = '/Volumes/JudyYang_SoilC/Confocal_dextran_glucose_diffuse/Sept12_glucose_3d/Matlab/Super_impose2/'
+z_nb = [42];
+dx = 1.517; % in micron
+gap = 20; 
+
+dz = 0.988; %um 
+z_dis = [1:z_nb(1)]*dz;
+pixel_nb = 512;
+pixel_size = dx;
+image_size = pixel_nb*pixel_size; % microns
+x_nb = pixel_nb;
+
+dt = 1; % minutes
+t_nb = 95;
+T_tot_hr = dt*t_nb*numel(series_nb)/60; % hours
+t_all = [0:dt/60:T_tot_hr]; % hours
+
+t_carbon = 2.1;
+t_nocarbon = 23;
+
+%%
+A_clay0  = imread([file_path_bf,'t_96','.tif']);
+figure 
+imshow(A_clay0)
+
+% rect = getrect % [xmin ymin width height]
+% rect = round(rect);
+
+rect = [219   268    52    52];
+% rect = [397   170    50    46];
+rect_bkg = [ 327   171    56    36];
+
+
+% x = [rect(3):-1:0]*dx;%
+x = [0:1:rect(3)]*dx;%
+y = [0:1:rect(4)]*dx;
+z = [z_nb(1)/2 : -1 : -z_nb(1)/2 -1]*dz; %0.988
+[Xmesh,Ymesh,Zmesh] = meshgrid(x,y,z);
+
+%% Specify the plane over which to slice
+z_cut = 0;
+x_cut = 30*dx;
+y_cut = 30*dx;
+z_eps = dz;
+
+colorset = jet(sum(t_nb));
+
+claysurfacedata = load('clay_surface_tot.mat');
+fo_all = claysurfacedata.fo_all;
+vo_all = claysurfacedata.vo_all;
+fo = claysurfacedata.fo;
+vo = claysurfacedata.vo;
+
+mapdata = load('greenmap.mat');
+greenmap = mapdata.greenmap;
+
+z_3d_unique = unique(vo_all(:,3));
+figure; hold on
+set(gca,'fontsize',42,'linewidth',2,'fontweight','bold');
+            
+for jj = 1:numel(z_3d_unique)
+    z_3d_indx = find(vo_all(:,3)==z_3d_unique(jj));
+    x_3d{jj} = vo_all(z_3d_indx,1);
+    y_3d{jj} = vo_all(z_3d_indx,2);
+%     scatter3(x_3d{jj}',y_3d{jj}',z_3d_unique(jj)*ones(numel(x_3d{jj}),1));
+end
+
+%%
+tt_record = [];
+
+for kk0= 1:numel(series_nb)
+    for tt_i = 1:gap:t_nb(1)
+        
+              tt = (kk0-1)*t_nb(1) + tt_i;
+        tt_record = cat(1,tt_record,tt);
+        se_id = sprintf('%03d', series_nb(kk0));
+        folder_name = [folder_name0,num2str(se_id),'/'];
+        file_name = [file_name_pre ,num2str(se_id)];
+        Imatrix{tt} = [];
+        
+        clay_tot_int(tt) = 0;
+        for zz = 1: z_nb
+
+            pic_tid = sprintf('%02d', tt_i-1);
+            pic_zid = sprintf('%02d', zz-1);
+            filename_OM{zz} = [file_name,'_t',num2str(pic_tid),'_z',num2str(pic_zid),'_ch00'];
+            filename_BF{zz} = [file_name,'_t',num2str(pic_tid),'_z',num2str(pic_zid),'_ch01'];
+            A_clay0  = imread([file_path,folder_name,filename_OM{zz},'.tif']);
+
+            A_clay = imcrop(A_clay0,rect);
+            A_clay_bkg = imcrop(A_clay0,rect_bkg);
+
+            Imatrix{tt} = cat(3, Imatrix{tt}, double(A_clay));
+            
+            %% read clay intensity 
+            
+            A_double = double(A_clay);
+            A_array = reshape(A_double, [numel(A_double),1]);
+            img_int_clay{tt}(zz) = mean(A_array);
+            img_int_clay_std{tt}(zz) = std(A_array);
+            
+            A_double_bkg = double(A_clay_bkg);
+            A_array_bkg = reshape(A_double_bkg, [numel(A_double_bkg),1]);
+            img_int_clay_bkg{tt}(zz) = mean(A_array_bkg);
+            img_int_clay_bkg_std{tt}(zz) = std(A_array_bkg);
+
+            A_double = double(A_clay);
+            A_array = reshape(A_double, [numel(A_double),1]);
+            img_int_tot{zz}(tt) = mean(A_array);
+            img_int_tot_std{zz}(tt) = std(A_array);
+            
+            
+            img_int_t{tt}(zz) = img_int_tot{zz}(tt);
+            clay_tot_int(tt) = clay_tot_int(tt) + img_int_tot{zz}(tt);
+       
+        end
+        
+        clay_3D_int(tt) = clay_tot_int(tt)/z_nb;
+        [ int_tot_max_t(tt), index_z_max(tt)] = max(img_int_t{tt});
+
+         z = [1:1:z_nb(1)]*dz-index_z_max(tt)*dz; %0.988
+         z = - z;
+        [Xmesh,Ymesh,Zmesh] = meshgrid(x,y,z);
+
+        %
+        %
+ %% calculate the average fluorescent intensity inside the clay
+        %%
+        %%
+        index_inclay = nan(size(Xmesh));
+        
+               
+        for ijj = 1:numel(z)
+            if z(ijj)>=min(z_3d_unique) & z(ijj)<=max(z_3d_unique)
+%                 ijj
+                [z_m, z_index] =  min(abs(z(ijj)-z_3d_unique));
+                index_z = inpolygon( Xmesh(:,:,ijj),Ymesh(:,:,ijj),x_3d{z_index},y_3d{z_index});
+                index_inclay(:,:,ijj) = index_z;
+            end
+        end
+        inclay_index_allpts = find(index_inclay==1);
+%         scatter3(Xmesh(inclay_index_allpts),Ymesh(inclay_index_allpts),Zmesh(inclay_index_allpts));
+        
+        Clay_ave_int(tt) = mean(Imatrix{tt}(inclay_index_allpts));
+
+        
+        %% save the slicing image 
+            figure(316); hold on;
+            set(gca,'fontsize',24,'linewidth',2); %,'fontweight','bold'
+            
+%             index_1st = find(Zmesh>=z_cut & Xmesh<=x_cut & Ymesh<=y_cut); %-z_eps=
+%             Ima_value = Imatrix{tt};
+%             [fo_all,vo_all] = isosurface(Xmesh,Ymesh,Zmesh,Ima_value/255,0.1);
+%             Ima_value(index_1st) = 0;
+%             [fo,vo] = isosurface(Xmesh,Ymesh,Zmesh,Ima_value/255,0.1);
+%             save('clay_surface_tot.mat','fo','vo','fo_all','vo_all','Ima_value')
+            p1 = patch('Faces', fo, 'Vertices', vo);       % draw the outside of the volume
+            p1.FaceColor = [231 230 230]/255;% [237 126 57]/255; %[231 230 230]
+            p1.EdgeColor = 'none';
+%             alpha(0.5)
+            view(-30,30)
+%             camlight
+%             lighting gouraud
+            camlight('headlight')
+
+            hslice = slice(Xmesh,Ymesh,Zmesh,Imatrix{tt}/255,x_cut , y_cut ,z_cut); %
+            set(hslice,'visible','off','LineStyle','none','EdgeColor','none', 'FaceColor','interp')
+            colorMap =colormap(gray(round(255*2)));
+            
+
+            %% extract hslice data 
+            xlice_data = get(  hslice ,'XData');
+            ylice_data = get(  hslice ,'YData');
+            zlice_data = get(  hslice ,'ZData');
+            clice_data = get(  hslice ,'CData');
+            
+            %%
+            %% plot the x surface 
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%% find the contour of the clay in the x surface %%%%%%%%%%%%%%%%
+            index_contour1 = find(vo_all(:,1)==x_cut &vo_all(:,3)>=z_cut & vo_all(:,2)<=y_cut);
+
+            y_bnd_surf1 = unique(vo_all(index_contour1,2));
+            for kk = 1: numel(y_bnd_surf1)
+                index_bnd_sur1 = find(vo_all(:,1)==x_cut & vo_all(:,2)==y_bnd_surf1(kk));
+                z_bnd_surf1(kk) = max(vo_all(index_bnd_sur1,3));
+            end
+            z_bnd_surf1 = smooth(z_bnd_surf1);
+
+            %%%%%%%%%%%%%% set data outside the contour to be zero  %%%%%%%%%%%%
+            hface1_nanindex = find(zlice_data{1}<z_cut-3*dz | ylice_data{1}>y_cut | ylice_data{1}<min(y_bnd_surf1));
+            clice_data{1}(hface1_nanindex) = NaN;
+            
+            for kk = 1:numel(zlice_data{1})
+                if zlice_data{1}(kk)> interp1(y_bnd_surf1,z_bnd_surf1,ylice_data{1}(kk),'linear', 'extrap')
+                    zlice_data{1}(kk) = NaN;
+                end
+            end 
+                     
+            hface1 = surf(xlice_data{1},ylice_data{1},zlice_data{1},clice_data{1});
+            hface1.EdgeColor = 'none';
+            colormap(greenmap);
+            %%
+            %% plot the y surface 
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%% find the contour of the clay in the x surface %%%%%%%%%%%%%%%%
+
+            index_contour2 = find(vo_all(:,2)==y_cut &vo_all(:,3)>=z_cut & vo_all(:,1)<=x_cut);
+            
+            x_bnd_surf2 = unique(vo_all(index_contour2,1));        
+            for kk = 1: numel(x_bnd_surf2)
+                index_bnd_sur2 = find(vo_all(:,2)==y_cut & vo_all(:,1)==x_bnd_surf2(kk));
+                z_bnd_surf2(kk) = max(vo_all(index_bnd_sur2 ,3));
+            end
+            z_bnd_surf2 = smooth(z_bnd_surf2);
+            
+            %%%%%%%%%%%%%% set data outside the contour to be zero  %%%%%%%%%%%%
+            hface2_nanindex = find(zlice_data{2}<z_cut-3*dz | xlice_data{2}>x_cut | xlice_data{2}<min(x_bnd_surf2 ) );
+            clice_data{2}(hface2_nanindex) = NaN;
+            for kk = 1:numel(zlice_data{2})
+                if zlice_data{2}(kk)> interp1(x_bnd_surf2,z_bnd_surf2,xlice_data{2}(kk),'linear', 'extrap')
+                    zlice_data{2}(kk) = NaN;
+                end
+            end
+
+            hface2 = surf(xlice_data{2},ylice_data{2},zlice_data{2},clice_data{2});
+            hface2.EdgeColor = 'none';
+            
+  %%
+            %% plot the z surface 
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%% find the contour of the clay in the x surface %%%%%%%%%%%%%%%%
+
+%             index_contour3 = find(abs(vo_all(:,3)-z_cut)<z_eps &vo_all(:,2)<=y_cut & vo_all(:,1)<=x_cut);
+            index_contour3 = find(vo_all(:,3)==z_cut &vo_all(:,2)<=y_cut & vo_all(:,1)<=x_cut);
+            
+            x_bnd_surf3 = unique(vo_all(index_contour3,1));
+            for kk = 1: numel(x_bnd_surf3)
+%                 index_bnd_sur3 = find(abs(vo_all(:,3)-z_cut)<z_eps & vo_all(:,1)<=x_bnd_surf3(kk));
+                index_bnd_sur3 = find(vo_all(:,3)==z_cut & vo_all(:,1)==x_bnd_surf3(kk));
+                
+                y_bnd_surf3(kk) = min(vo_all(index_bnd_sur3 ,2));
+            end
+            y_bnd_surf3 = smooth(y_bnd_surf3);
+            
+            %%%%%%%%%%%%%% set data outside the contour to be zero  %%%%%%%%%%%%
+            hface3_nanindex = find(xlice_data{3}>x_cut+3*dx |xlice_data{3}<min(x_bnd_surf3) |ylice_data{3}>y_cut | ylice_data{3}<min(unique(vo_all(index_contour3,2))) );
+            clice_data{3}(hface3_nanindex) = NaN;
+            index_sur_include = find(x_bnd_surf3<=10.9477 | x_bnd_surf3>=19.721);
+            
+            for kk = 1:numel(zlice_data{3})
+                if ylice_data{3}(kk)< interp1(x_bnd_surf3(index_sur_include),y_bnd_surf3(index_sur_include),xlice_data{3}(kk),'linear', 'extrap');
+                    ylice_data{3}(kk) = NaN;
+                end
+            end
+            
+            hface3 = surf(xlice_data{3},ylice_data{3},zlice_data{3},clice_data{3});
+            hface3.EdgeColor = 'none';
+%             scatter3(x_bnd_surf3,y_bnd_surf3,z_cut*ones(numel(x_bnd_surf3),1));           
+            
+            colormap(greenmap);
+%             hcb = colorbar('Location','northOutside','AxisLocation','in');
+%             hcb = colorbar('AxisLocation','in');
+%             hcb.Label.String = 'FLuorescent intensity';
+% %             title(hcb,['Fluorescent intensity'],'fontweight','bold')
+%             caxis manual
+%             caxis([0 1]);
+            
+            
+           
+            
+%             xh = get(gca,'XLabel'); % Handle of the x label
+%             set(xh, 'Units', 'Normalized')
+%             pos = get(xh, 'Position');
+%             set(xh, 'Position',pos.*[1,1,1],'Rotation',40)
+
+            axis equal
+            xlim([0 80]);
+            ylim([0 80]);
+            zlim([-16 20])
+%             set(gcf,'color','k');
+%             set(gca,'xtick',[])
+%             set(gca,'ytick',[])
+%             set(gca,'ztick',[])
+%             yticks([0 20 40]);
+            xlabel('x [\mum]')
+            ylabel('y [\mum]')
+            zlabel('z [\mum]')
+            xticks([0 40 80])
+            yticks([0 40 80])
+            zticks([-15 0 15])
+            axesLabelsAlign3D
+%             set(gca,'ytick',[])
+%             title('3-5kDa Dextran')
+            box on
+%             grid on
+
+            if tt<t_carbon*60/dt
+            set(gca,'color',[1 1 1])
+            elseif tt<t_nocarbon*60/dt
+            set(gca,'color',greenmap(36,:))
+            else 
+            set(gca,'color',[1 1 1])
+            end
+            
+            
+            fig = gcf;
+            fig.InvertHardcopy = 'off';
+            
+            set(gcf,'color','w');
+
+%             set(hcb,'Position',[0.90 0.20 0.03 0.56])% To change size
+            set(gcf,'PaperPositionMode','Manual')
+            set(gcf,'PaperUnits','inches')
+            set(gcf,'PaperSize',[9 6])
+            set(gcf,'PaperPosition',[0 0 9 6])
+            saveas(gcf, [pwd,'/4Dplot_June2020_tiff_2/','slice','_t',num2str(tt)], 'tiff')
+       clf
+    end
+end
+
+save('3D_iamge_June2020.mat')
+
+
+%%
+figure; hold on;
+set(gca,'fontsize',36,'linewidth',2,'fontweight','bold');
+            
+ colormap(greenmap)
+%  set(gca,'xtick',[],'XTickLabel',[])
+% set(gca,'ytick',[],'YTickLabel',[])
+% set(gca,'ztick',[],'ZTickLabel',[])
+box off
+axis off
+% hAx = axes;
+% set(hAx, 'box','off','XTickLabel',[],'XTick',[],'YTickLabel',[],'YTick',[])
+            hcb = colorbar('Location','northOutside','AxisLocation','out');
+            set(hcb,'YTick',[0:0.5:1])
+% hcb = colorbar('AxisLocation','out');
+hcb.Label.String = 'FLuorescence intensity';
+set(gcf,'PaperPositionMode','Manual')
+set(gcf,'PaperUnits','inches')
+set(gcf,'PaperSize',[10 12])
+set(gcf,'PaperPosition',[0 0 10 12])
+saveas(gcf, [pwd,'/','colorbar3'], 'pdf')
+%
+
+%% plot background concentration 
+
+tt_record = [];
+for kk0= 1:numel(series_nb)%[1:3,7:12,numel(series_nb)-1,numel(series_nb)] %1:numel(series_nb)
+    for tt_i =  1:gap:t_nb(1)
+        tt = (kk0-1)*t_nb(1) + tt_i;
+        tt = (kk0-1)*t_nb(1) + tt_i;
+        tt_record = cat(1,tt_record,tt);
+    end
+end
+
+%%
+tt_carbon = tt_record*dt/60-t_carbon-0.15;
+% clay_glu_int = clay_3D_int(tt_record)/255;
+clay_glu_int = Clay_ave_int(tt_record)/255;
+
+%% plot average clay intensity and average clay area 
+h_intt = figure; hold on
+set(gca,'fontsize',20,'linewidth',2,'fontweight','bold');
+
+index_sorb = find(tt_carbon>0& tt_carbon<=t_nocarbon-t_carbon);
+index_desorb = find(tt_carbon>t_nocarbon-t_carbon);
+h1 = plot(tt_carbon(index_sorb) , clay_glu_int(index_sorb),'-','color',greenmap(126,:),'markersize',12,'linewidth',2);% hour 
+h2 = plot(tt_carbon(index_desorb) , clay_glu_int(index_desorb),'k-','markersize',12,'linewidth',2);% hour 
+h1 = plot(tt_carbon(index_sorb) , clay_glu_int(index_sorb),'-','color',greenmap(126,:),'markersize',12,'linewidth',2);% hour 
+
+% h1 = plot([1 31 162]*dt/60-t_carbon , clay_3D_int([1 21 162])/255-clay_3D_int(tt_record(1))/255,'kd','markerfacecolor','k','markersize',16,'linewidth',2);% hour  
+% h1 = plot(tt_record([1 4 18])*dt/60-t_carbon , clay_3D_int(tt_record([1 4 18]))/255,'kd','markerfacecolor','k','markersize',16,'linewidth',2);% hour 
+
+
+ylabel(['Average fluorescence', char(10),'intensity in clay']);
+% ylim([0 0.05])
+% xlim([-1 40])
+% xlim([-2 70])
+% 
+ylimit_int = 0.25;
+% plot(0*ones(2,1),[0,ylimit_int],'k--','markersize',16,'markerfacecolor','k','linewidth',2)
+% 
+plot((t_nocarbon-t_carbon)*ones(2,1),[0,ylimit_int],'k--','markerfacecolor','k','markersize',16,'linewidth',2)
+% annotation('arrow',[t_nocarbon-t_carbon+1,t_nocarbon-t_carbon]/72, [0.15*ylimit_int,0.1*ylimit_int]/0.25,'t_{wash}','fontsize',20,'fontweight','bold')
+
+
+box on
+xlabel('Time [hours]')
+% title(figure_title);
+
+set(h_intt ,'PaperPositionMode','Manual')
+set(h_intt ,'PaperUnits','inches')
+set(h_intt ,'PaperSize',[12 6])
+set(h_intt ,'PaperPosition',[0 0 12 6])
+saveas(h_intt , ['clay_int_time_Feb2020'], 'pdf')
+
+clay_C_int = clay_glu_int;
+save('Clay_Nb1_int_23_5kDa_dextran_July2020.mat','tt_carbon','clay_C_int','index_sorb','index_desorb');
