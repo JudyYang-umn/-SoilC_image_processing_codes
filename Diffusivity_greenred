@@ -1,0 +1,147 @@
+%% plot green diffusivity 
+
+t_35kda_dextran = (35-3)*dt/60; %hours
+t_20kda_dextran = (125-3)*dt/60+1;
+t_70kda_dextran = (179-3)*dt/60+1;
+t_M9 = (246-3)*dt/60;
+t_enzyme = (293-3)*dt/60;
+
+tt_green = g_diff_index*dt/60-t_35kda_dextran-0.8333;
+zz_green_sq = zz_g_eg(g_diff_index).^2;
+
+tt_red = red_diff_index*dt/60-t_35kda_dextran-0.8333;
+zz_red_sq = zz_red_eg(red_diff_index).^2;
+
+%% 
+%%%
+%%
+%%
+
+    h_prf_red = figure(16); hold on
+%             set(h_pdf,'visible','off');
+    set(gca,'fontsize',22,'fontweight','bold','linewidth',2);             
+    plot(tt_green,zz_green_sq,'x','color',[43 101 47]/255,'markersize',9,'linewidth',1);
+    plot(tt_red,zz_red_sq,'x','color',[230 28 28]/255,'markersize',9,'linewidth',1);
+
+        ylimit_int = 1*10^5;
+        
+    plot(t_35kda_dextran*ones(2,1)-t_35kda_dextran,[0,ylimit_int],'k--','markersize',16,'markerfacecolor','k','linewidth',1)
+%     text(t_35kda_dextran+1, 0.06*ylimit_int,'t_{greenC}','fontsize',24,'fontweight','bold')
+
+    plot(t_20kda_dextran*ones(2,1)-t_35kda_dextran,[0,ylimit_int],'k--','markersize',16,'markerfacecolor','k','linewidth',1)
+%     text(t_20kda_dextran+1, 0.06*ylimit_int,'t_{redC}','fontsize',24,'fontweight','bold')
+
+    plot(t_70kda_dextran*ones(2,1)-t_35kda_dextran,[0,ylimit_int],'k--','markersize',16,'markerfacecolor','k','linewidth',1)
+%     text(t_70kda_dextran+1, 0.06*ylimit_int,'t_{greenC2}','fontsize',24,'fontweight','bold')
+    ylim([ -ylimit_int/50 ylimit_int])
+
+    plot(t_M9*ones(2,1)-t_35kda_dextran,[0,ylimit_int],'k--','markersize',16,'markerfacecolor','k','linewidth',1)
+%     text(t_M9+1, 0.06*ylimit_int,'t_{noC}','fontsize',24,'fontweight','bold')
+
+    plot(t_enzyme*ones(2,1)-t_35kda_dextran,[0,ylimit_int],'k--','markersize',16,'markerfacecolor','k','linewidth',1)
+%     text(t_enzyme+1, 0.06*ylimit_int,'t_{enzyme}','fontsize',24,'fontweight','bold')
+
+
+    xlabel('Time [hours]')
+    ylabel('z_F^2 [\mum^2]');
+    ylim([-100 8000]);
+    yticks([0 4000 8000]);
+    xlim([-3 60])
+         %% click on the two points to interpolate the data
+    linetype = {'-','--'};
+         for jj = 1:2
+        waitfor(msgbox('Click on two limits for the slope '))
+        [xi_limit,yi_limit] = getpts;
+%         xi_limit = [6.1869 12.6010];
+%         [xi_limit,yi_limit] = [6.0859    0.0575; 12.4495    5.5783]
+        green_indx = find(tt_green>=xi_limit(1) & tt_green<=xi_limit(2));
+        tgreen_select= tt_green(green_indx);
+        zgreen_select= zz_green_sq(green_indx);
+        
+            kjj = 1.02;
+        if jj == 1
+            kjj = 1.36
+        end
+        
+        p_green{jj} = polyfit(tgreen_select,zgreen_select',1);
+        tgreen_expand = linspace(0.8*min(tgreen_select),kjj*max(tgreen_select),10);
+        zgreen_fit{jj} = polyval(p_green{jj},tgreen_expand);
+        hleg(jj) = plot(tgreen_expand,zgreen_fit{jj}',linetype{jj},'color',[43 101 47]/255,'linewidth',2)
+               
+        %%%%%%% calculate R sqaure %%%%%%
+                
+        Bbar = mean(zgreen_select');
+        SStot = sum((zgreen_select' - Bbar).^2);
+        SSreg = sum((zgreen_fit{jj} - Bbar).^2);
+        SSres = sum((zgreen_select' - zgreen_fit{jj}).^2);
+        R2 = 1 - SSres/SStot
+
+        R_green{jj} = corrcoef(tgreen_select,zgreen_select');
+        Rsq_green(jj) = R_green{jj}(1,2).^2
+        
+         end
+        %% 
+        
+
+    
+          %% click on the two points to interpolate the data
+    linetype = {'-','--'};
+         for jj = 1:2
+        waitfor(msgbox('Click on two limits for the slope '))
+        [xi_limit,yi_limit] = getpts;
+%         xi_limit = [6.1869 12.6010];
+%         [xi_limit,yi_limit] = [6.0859    0.0575; 12.4495    5.5783]
+        red_indx = find(tt_red>=xi_limit(1) & tt_red<=xi_limit(2));
+        tred_select= tt_red(red_indx);
+        zred_select= zz_red_sq(red_indx);
+        
+        p_red{jj} = polyfit(tred_select,zred_select',1);
+        kjj = 1.12;
+        if jj == 1
+            kjj = 1.42
+        end
+      
+        tred_expand = linspace(0.8*min(tred_select),kjj*max(tred_select),10);
+        zred_fit{jj} = polyval(p_red{jj},tred_expand);
+        hleg(2+jj) = plot(tred_expand,zred_fit{jj}',linetype{jj},'color',[230 28 28]/255,'linewidth',2)
+               
+        %%%%%%% calculate R sqaure %%%%%%
+                
+        Bbar = mean(zred_select');
+        SStot = sum((zred_select' - Bbar).^2);
+        SSreg = sum((zred_fit{jj} - Bbar).^2);
+        SSres = sum((zred_select' - zred_fit{jj}).^2);
+        R2 = 1 - SSres/SStot
+
+        R_red{jj} = corrcoef(tred_select,zred_select');
+        Rsq_red(jj) = R_red{jj}(1,2).^2
+        
+         end
+         
+
+%         legend(hleg,['D = ',num2str(round(p_green{1}(1)/4/100)*100),' \mum^2/hour',char(10),'R^2 = ',num2str(Rsq_green(1),2)],...
+%             ['D = ',num2str(round(p_green{2}(1)/4/100)*100),' \mum^2/hour',char(10),'R^2 = ',num2str(Rsq_green(2),2)],...
+%             ['D = ',num2str(round(p_red{1}(1)/4)),' \mum^2/hour',char(10),'R^2 = ',num2str(Rsq_red(1),2)],...
+%             ['D = ',num2str(round(p_red{2}(1)/4/100)*100),' \mum^2/hour',char(10),'R^2 = ',num2str(Rsq_red(2),2)],...
+%         'fontweight','normal','location','eastoutside');
+    
+        legend(hleg,['D = ',num2str(round(p_green{1}(1)/4/0.36/100)*100),' \times 10^{-12} cm^2/s',char(10),'R^2 = ',num2str(Rsq_green(1),2)],...
+            ['D = ',num2str(round(p_green{2}(1)/4/0.36/100)*100),' \times 10^{-12} cm^2/s',char(10),'R^2 = ',num2str(Rsq_green(2),2)],...
+            ['D = ',num2str(round(p_red{1}(1)/4/0.36/10)*10),' \times 10^{-12} cm^2/s',char(10),'R^2 = ',num2str(Rsq_red(1),2)],...
+            ['D = ',num2str(round(p_red{2}(1)/4/0.36/100)*100),' \times 10^{-12} cm^2/s',char(10),'R^2 = ',num2str(Rsq_red(2),2)],...
+        'fontweight','normal','location','eastoutside');
+    
+        legend boxoff
+        
+        xticks([0 20 40])
+
+    xlabel('Time [hours]')
+    ylabel('z_{front}^2 [\mum^2]');
+    ylim([-100 8000]);
+    yticks([0 4000 8000]);
+%     title('Green 3-5kDa dextran');
+    box off;
+    
+    set(gcf,'PaperSize',[16 6])
+    set(gcf,'PaperPosition',[0 0 16 6])
+    saveas(gcf, ['green_red_diff_July2020'], 'pdf')
